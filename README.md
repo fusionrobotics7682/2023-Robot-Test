@@ -4,10 +4,10 @@
 #### Definition
 *2023-Robot-Test has 4 main directories. Each directory has its own private directory. Tasks are represented by projects*
 
-##### 1. Autonomous
+#### 1. Autonomous
 * Autonomous directory has unit, integrated, path tracking tests. Each test configured in a project.*
 
-##### 2. Manual
+#### 2. Manual
 *Manual directory includes sensor output, unit mechanism tests.*
 **Structured tests according to mechanism safety.**
 ##### 3. Odometry
@@ -15,7 +15,7 @@
 - Arm odometry
 - Drive odometry
 - Upgraded drive odometry
-##### 4. Vision
+#### 4. Vision
 *Vision directory contains vision odometry tests. It will assist in tele-op, autonomous and odometry.*
 
 #### How to use?
