@@ -4,9 +4,17 @@
 
 package frc.robot;
 
+import com.kauailabs.navx.frc.AHRS;
+import com.revrobotics.ColorMatch;
+import com.revrobotics.ColorMatchResult;
+import com.revrobotics.ColorSensorV3;
+
+import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj.I2C.Port;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj.util.Color;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -15,9 +23,19 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
  * project.
  */
 public class Robot extends TimedRobot {
-  private Command m_autonomousCommand;
+  
+  private AHRS navx = new AHRS();
+  private ColorSensorV3 colorSensor = new ColorSensorV3(Port.kOnboard);
+  private Encoder encoder = new Encoder(6,7);
 
-  private RobotContainer m_robotContainer;
+  private ColorMatch colorMatch = new ColorMatch();
+
+  private Color red = new Color(255, 0, 0);
+  private Color blue = new Color(0, 0, 255);
+  private Color green = new Color(0, 255, 0);
+  private Color purple = new Color(0.22, 0.33, 0.445);
+  private final Color yellow = new Color(0.40, 0.55, 0.057);
+  private String currentColor = "";
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -25,9 +43,8 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
-    // Instantiate our RobotContainer.  This will perform all our button bindings, and put our
-    // autonomous chooser on the dashboard.
-    m_robotContainer = new RobotContainer();
+    colorMatch.addColorMatch(purple);
+    colorMatch.addColorMatch(yellow);
   }
 
   /**
@@ -39,65 +56,29 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotPeriodic() {
-    // Runs the Scheduler.  This is responsible for polling buttons, adding newly-scheduled
-    // commands, running already-scheduled commands, removing finished or interrupted commands,
-    // and running subsystem periodic() methods.  This must be called from the robot's periodic
-    // block in order for anything in the Command-based framework to work.
-    CommandScheduler.getInstance().run();
-  }
 
-  /** This function is called once each time the robot enters Disabled mode. */
-  @Override
-  public void disabledInit() {}
-
-  @Override
-  public void disabledPeriodic() {}
-
-  /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
-  @Override
-  public void autonomousInit() {
-    m_autonomousCommand = m_robotContainer.getAutonomousCommand();
-
-    // schedule the autonomous command (example)
-    if (m_autonomousCommand != null) {
-      m_autonomousCommand.schedule();
+    Color color = colorSensor.getColor();
+    SmartDashboard.putNumber("Navx getAngle() :", navx.getAngle());
+    SmartDashboard.putNumber("Navx angle adjustment :", navx.getAngleAdjustment());
+    SmartDashboard.putNumber("Navx getCompassheadind()", navx.getCompassHeading());
+    SmartDashboard.putNumber("R", color.red);
+    SmartDashboard.putNumber("G", color.green);
+    SmartDashboard.putNumber("B", color.blue);
+    SmartDashboard.putNumber("Navx getYaw()", navx.getYaw());
+    double value = 360/1024;
+    SmartDashboard.putNumber("Angle :", 0.3515 * encoder.getDistance());
+    SmartDashboard.putNumber("Raw encoder value :", encoder.getDistance());
+    
+    if(colorMatch.matchClosestColor(color).color == purple){
+      currentColor = "purple";
     }
-  }
-
-  /** This function is called periodically during autonomous. */
-  @Override
-  public void autonomousPeriodic() {}
-
-  @Override
-  public void teleopInit() {
-    // This makes sure that the autonomous stops running when
-    // teleop starts running. If you want the autonomous to
-    // continue until interrupted by another command, remove
-    // this line or comment it out.
-    if (m_autonomousCommand != null) {
-      m_autonomousCommand.cancel();
+    else if(colorMatch.matchClosestColor(color).color == yellow){
+      currentColor = "yellow";
     }
+    else{
+      currentColor = "NONE";
+    }
+    SmartDashboard.putString("Current color", currentColor);
   }
 
-  /** This function is called periodically during operator control. */
-  @Override
-  public void teleopPeriodic() {}
-
-  @Override
-  public void testInit() {
-    // Cancels all running commands at the start of test mode.
-    CommandScheduler.getInstance().cancelAll();
-  }
-
-  /** This function is called periodically during test mode. */
-  @Override
-  public void testPeriodic() {}
-
-  /** This function is called once when the robot is first started up. */
-  @Override
-  public void simulationInit() {}
-
-  /** This function is called periodically whilst in simulation. */
-  @Override
-  public void simulationPeriodic() {}
 }
