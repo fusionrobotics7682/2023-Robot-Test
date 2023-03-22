@@ -4,7 +4,21 @@
 
 package frc.robot;
 
+import com.kauailabs.navx.frc.AHRS;
+import com.revrobotics.CANSparkMax;
+import com.revrobotics.CANSparkMax.IdleMode;
+import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+
+import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
@@ -15,10 +29,21 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * project.
  */
 public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+  CANSparkMax leftMaster = new CANSparkMax(0, MotorType.kBrushless);
+  CANSparkMax leftSlave = new CANSparkMax(1, MotorType.kBrushless);
+  CANSparkMax rightMaster = new CANSparkMax(2, MotorType.kBrushless);
+  CANSparkMax rightSlave = new CANSparkMax(3, MotorType.kBrushless);
+
+  DifferentialDrive drive = new DifferentialDrive(leftMaster,rightMaster);
+  AHRS navx = new AHRS();
+  DifferentialDrivePoseEstimator differentialDrivePoseEstimator = new DifferentialDrivePoseEstimator(new DifferentialDriveKinematics(0.23), new Rotation2d(), 0, 0, new Pose2d());
+  Field2d field2d = new Field2d();
+
+  Joystick joystick = new Joystick(0);
+
+  PowerDistribution powerDistribution = new PowerDistribution(0, ModuleType.kRev);
+  SendableChooser<IdleMode> sendableChooser = new SendableChooser<IdleMode>();
+  double inputFactor = 1;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -26,9 +51,14 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
+    leftSlave.follow(leftMaster);
+    rightSlave.follow(rightMaster);
+
+    // Add chooser to SmartDashboard
+    sendableChooser.setDefaultOption("CoastDrive", IdleMode.kCoast);
+    sendableChooser.addOption("BrakeDrive", IdleMode.kBrake);
+    SmartDashboard.putData(sendableChooser);    
+    SmartDashboard.putData("Robot Pose on Field", field2d);
   }
 
   /**
@@ -39,68 +69,44 @@ public class Robot extends TimedRobot {
    * SmartDashboard integrated updating.
    */
   @Override
-  public void robotPeriodic() {}
+  public void robotPeriodic() {
+    // General Information about the Robot
+    SmartDashboard.putNumber("voltage",powerDistribution.getVoltage() );
+    SmartDashboard.putNumber("totalCurrent", powerDistribution.getTotalCurrent());
+    SmartDashboard.putNumber("leftMasterVoltage",powerDistribution.getCurrent(0));
+    SmartDashboard.putNumber("leftSlaveVoltage",powerDistribution.getCurrent(1));
+    SmartDashboard.putNumber("rightMasterVoltage",powerDistribution.getCurrent(2));
+    SmartDashboard.putNumber("rightSlaveVoltage",powerDistribution.getCurrent(3));
+    SmartDashboard.putNumber("inputFactor", inputFactor);
 
-  /**
-   * This autonomous (along with the chooser code above) shows how to select between different
-   * autonomous modes using the dashboard. The sendable chooser code works with the Java
-   * SmartDashboard. If you prefer the LabVIEW Dashboard, remove all of the chooser code and
-   * uncomment the getString line to get the auto name from the text box below the Gyro
-   *
-   * <p>You can add additional auto modes by adding additional comparisons to the switch structure
-   * below with additional strings. If using the SendableChooser make sure to add them to the
-   * chooser code above as well.
-   */
-  @Override
-  public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
-  }
+    double leftMeterDistance = 2 * 3.14 * 0.0254 * (leftMaster.getEncoder().getPosition() / 10.72);
+    double rightMasterDistance = 2 * 3.14 * 0.0254 * (rightMaster.getEncoder().getPosition() / 10.72);
+    differentialDrivePoseEstimator.update(navx.getRotation2d(), leftMeterDistance, rightMasterDistance);
 
-  /** This function is called periodically during autonomous. */
-  @Override
-  public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
+    field2d.setRobotPose(differentialDrivePoseEstimator.getEstimatedPosition());
+
+    // Input Factor Test
+    if(joystick.getRawButton(1)){
+      inputFactor = 1;
+    }
+    else if(joystick.getRawButton(2)){
+      inputFactor = 0.75;
+    }
+    else if(joystick.getRawButton(3)){
+      inputFactor = 0.50; 
+    }
+    else if(joystick.getRawButton(4)){
+      inputFactor = 0.25;
     }
   }
-
   /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {}
 
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() {}
-
-  /** This function is called once when the robot is disabled. */
-  @Override
-  public void disabledInit() {}
-
-  /** This function is called periodically when disabled. */
-  @Override
-  public void disabledPeriodic() {}
-
-  /** This function is called once when test mode is enabled. */
-  @Override
-  public void testInit() {}
-
-  /** This function is called periodically during test mode. */
-  @Override
-  public void testPeriodic() {}
-
-  /** This function is called once when the robot is first started up. */
-  @Override
-  public void simulationInit() {}
-
-  /** This function is called periodically whilst in simulation. */
-  @Override
-  public void simulationPeriodic() {}
+  public void teleopPeriodic() {
+    // Drive Test with coeffecient
+    drive.arcadeDrive(joystick.getRawAxis(1)*inputFactor, joystick.getRawAxis(4)*inputFactor);
+  }
 }
