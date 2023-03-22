@@ -27,7 +27,9 @@ package frc.robot;
  import edu.wpi.first.apriltag.AprilTagFieldLayout;
  import edu.wpi.first.apriltag.AprilTagFields;
  import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.wpilibj.DriverStation;
  import java.io.IOException;
  import java.util.Optional;
@@ -51,8 +53,8 @@ import edu.wpi.first.wpilibj.DriverStation;
              // Create pose estimator
              photonPoseEstimator =
                      new PhotonPoseEstimator(
-                             fieldLayout, PoseStrategy.MULTI_TAG_PNP, photonCamera, new Transform3d());
-             photonPoseEstimator.setMultiTagFallbackStrategy(PoseStrategy.LOWEST_AMBIGUITY);
+                             fieldLayout, PoseStrategy.CLOSEST_TO_LAST_POSE, photonCamera, new Transform3d(new Translation3d(0.3, 0, 0), new Rotation3d()));
+             photonPoseEstimator.setMultiTagFallbackStrategy(PoseStrategy.AVERAGE_BEST_TARGETS);
          } catch (IOException e) {
              // The AprilTagFieldLayout failed to load. We won't be able to estimate poses if we don't know
              // where the tags are.
