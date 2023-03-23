@@ -4,6 +4,13 @@
 
 package frc.robot;
 
+import com.revrobotics.CANSparkMax;
+import com.revrobotics.RelativeEncoder;
+import com.revrobotics.SparkMaxPIDController;
+import com.revrobotics.CANSparkMax.ControlType;
+import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+
+import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -15,10 +22,16 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * project.
  */
 public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+
+  CANSparkMax turretSparkMax = new CANSparkMax(0, MotorType.kBrushless);
+  SparkMaxPIDController pidController = turretSparkMax.getPIDController();
+  RelativeEncoder encoder = turretSparkMax.getEncoder();
+
+  private Joystick joystick = new Joystick(0);
+
+  private final double GEAR_RATIO = 12.0;
+  private final double DEGREES_2_POSITION = GEAR_RATIO / 360;
+  private final double POSITION_2_DEGREES = 360 / GEAR_RATIO;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -26,9 +39,15 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
+    encoder.setPosition(0);
+
+    // PID Config
+    pidController.setP(0.0001);
+    pidController.setI(0.0000001);
+    pidController.setD(0.0001);
+    pidController.setIZone(0.0);
+    pidController.setFF(0.000156);
+    pidController.setOutputRange(-1, 1);
   }
 
   /**
@@ -39,7 +58,10 @@ public class Robot extends TimedRobot {
    * SmartDashboard integrated updating.
    */
   @Override
-  public void robotPeriodic() {}
+  public void robotPeriodic() {
+    SmartDashboard.putNumber("Turret Degrees :", encoder.getPosition() * POSITION_2_DEGREES);
+    SmartDashboard.putNumber("Turret Position :", encoder.getPosition());
+  }
 
   /**
    * This autonomous (along with the chooser code above) shows how to select between different
@@ -53,23 +75,6 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
-  }
-
-  /** This function is called periodically during autonomous. */
-  @Override
-  public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
-    }
   }
 
   /** This function is called once when teleop is enabled. */
@@ -78,7 +83,25 @@ public class Robot extends TimedRobot {
 
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() {}
+  public void teleopPeriodic() {
+    manualControl();
+
+    // PID Control
+    if(joystick.getRawButton(1)) pidControl(0);
+    if(joystick.getRawButton(2)) pidControl(45);
+    if(joystick.getRawButton(3)) pidControl(90);
+  }
+
+  public void manualControl(){
+    double speed = joystick.getY();
+    turretSparkMax.set(speed);
+    //pidController.setReference(speed, ControlType.kDutyCycle);
+  }
+
+  public void pidControl(double degreesSetpoint){
+    double targetPosition = degreesSetpoint * DEGREES_2_POSITION;
+    pidController.setReference(targetPosition, ControlType.kPosition);
+  }
 
   /** This function is called once when the robot is disabled. */
   @Override
