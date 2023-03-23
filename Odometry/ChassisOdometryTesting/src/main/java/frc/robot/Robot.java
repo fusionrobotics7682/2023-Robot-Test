@@ -29,6 +29,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * project.
  */
 public class Robot extends TimedRobot {
+
   CANSparkMax leftMaster = new CANSparkMax(0, MotorType.kBrushless);
   CANSparkMax leftSlave = new CANSparkMax(1, MotorType.kBrushless);
   CANSparkMax rightMaster = new CANSparkMax(2, MotorType.kBrushless);
@@ -44,6 +45,9 @@ public class Robot extends TimedRobot {
   PowerDistribution powerDistribution = new PowerDistribution(0, ModuleType.kRev);
   SendableChooser<IdleMode> sendableChooser = new SendableChooser<IdleMode>();
   double inputFactor = 1;
+
+  double gearRatio = 10.72;
+  double wheelRadiusMeter = 0.0254;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -79,8 +83,8 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("rightSlaveVoltage",powerDistribution.getCurrent(3));
     SmartDashboard.putNumber("inputFactor", inputFactor);
 
-    double leftMeterDistance = 2 * 3.14 * 0.0254 * (leftMaster.getEncoder().getPosition() / 10.72);
-    double rightMasterDistance = 2 * 3.14 * 0.0254 * (rightMaster.getEncoder().getPosition() / 10.72);
+    double leftMeterDistance = 2 * 3.14 * wheelRadiusMeter * (leftMaster.getEncoder().getPosition() / gearRatio);
+    double rightMasterDistance = 2 * 3.14 * wheelRadiusMeter * (rightMaster.getEncoder().getPosition() / gearRatio);
     differentialDrivePoseEstimator.update(navx.getRotation2d(), leftMeterDistance, rightMasterDistance);
 
     field2d.setRobotPose(differentialDrivePoseEstimator.getEstimatedPosition());
