@@ -4,8 +4,14 @@
 
 package frc.robot;
 
+import com.revrobotics.CANSparkMax;
+import com.revrobotics.RelativeEncoder;
+import com.revrobotics.SparkMaxPIDController;
+import com.revrobotics.CANSparkMax.ControlType;
+import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+
+import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 /**
@@ -15,10 +21,20 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * project.
  */
 public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+
+  private final CANSparkMax extensibleArm = new CANSparkMax(0, MotorType.kBrushless);
+  private final SparkMaxPIDController extensibleArmPID = extensibleArm.getPIDController();
+  private final RelativeEncoder extensibleArmEncoder = extensibleArm.getEncoder();
+
+  private final Joystick joystick = new Joystick(0);
+
+  // Calculations
+  private final double DEF_ARM_LENGTH_M = 1.2; // meters
+  private final double gearRatio = 100;
+  private final double winderDiameter = 0;
+  private final double winderPerimeter = 2 * Math.PI * winderDiameter;
+
+  private double currentArmLength;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -26,9 +42,14 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
+
+    // PID Config
+    extensibleArmPID.setP(0.0001);
+    extensibleArmPID.setI(0);
+    extensibleArmPID.setD(0);
+    extensibleArmPID.setIZone(0);
+    extensibleArmPID.setFF(0);
+    extensibleArmPID.setOutputRange(-1, 1);
   }
 
   /**
@@ -39,7 +60,13 @@ public class Robot extends TimedRobot {
    * SmartDashboard integrated updating.
    */
   @Override
-  public void robotPeriodic() {}
+  public void robotPeriodic() {
+    currentArmLength = DEF_ARM_LENGTH_M + extensibleArmEncoder.getPosition() / gearRatio * winderPerimeter;
+
+    // Monitoring Data
+    SmartDashboard.putNumber("Arm Length :", currentArmLength);
+    SmartDashboard.putNumber("Current Encoder Position :", extensibleArmEncoder.getPosition());
+  }
 
   /**
    * This autonomous (along with the chooser code above) shows how to select between different
@@ -53,33 +80,31 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
-  }
-
-  /** This function is called periodically during autonomous. */
-  @Override
-  public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
-    }
   }
 
   /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {}
-
+  
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() {}
-
+  public void teleopPeriodic() {
+    pidControl(0);
+    manualControl();
+  }
+  
+    public void pidControl(double lengthMeterSetpoint){
+      // This calculation giving position setpoint in meters
+      double lengthPositionSetpoint = lengthMeterSetpoint * gearRatio / winderPerimeter;
+      extensibleArmPID.setReference(lengthPositionSetpoint, ControlType.kPosition);
+    }
+  
+    public void manualControl() {
+      double joystickValue = joystick.getY();
+      //extensibleArmPID.setReference(joystickValue, ControlType.kDutyCycle);
+      extensibleArm.set(joystickValue);
+    }
+  
   /** This function is called once when the robot is disabled. */
   @Override
   public void disabledInit() {}
