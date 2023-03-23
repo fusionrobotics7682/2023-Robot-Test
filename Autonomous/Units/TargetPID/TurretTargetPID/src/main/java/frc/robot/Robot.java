@@ -4,7 +4,24 @@
 
 package frc.robot;
 
+import com.kauailabs.navx.frc.AHRS;
+import com.revrobotics.CANSparkMax;
+import com.revrobotics.RelativeEncoder;
+import com.revrobotics.SparkMaxPIDController;
+import com.revrobotics.CANSparkMax.ControlType;
+import com.revrobotics.CANSparkMax.IdleMode;
+import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+
+import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
@@ -15,10 +32,40 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * project.
  */
 public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+  CANSparkMax leftMaster = new CANSparkMax(0, MotorType.kBrushless);
+  CANSparkMax leftSlave = new CANSparkMax(1, MotorType.kBrushless);
+  CANSparkMax rightMaster = new CANSparkMax(2, MotorType.kBrushless);
+  CANSparkMax rightSlave = new CANSparkMax(3, MotorType.kBrushless);
+
+  CANSparkMax turret = new CANSparkMax(7, MotorType.kBrushless);
+  SparkMaxPIDController turretPIDController = turret.getPIDController();
+  RelativeEncoder turretEncoder = turret.getEncoder();
+
+  DifferentialDrive drive = new DifferentialDrive(leftMaster,rightMaster);
+  AHRS navx = new AHRS();
+
+  DifferentialDrivePoseEstimator differentialDrivePoseEstimator = new DifferentialDrivePoseEstimator(new DifferentialDriveKinematics(0.23), new Rotation2d(), 0, 0, new Pose2d());
+  PhotonCameraWrapper cameraWrapper = new PhotonCameraWrapper();
+
+  Field2d field2d = new Field2d();
+  Pose2d initialPose2d = new Pose2d();
+  Pose2d calculatedPose;
+  Pose2d target = new Pose2d();
+
+
+  // Drive Constants
+  private final double kPOSITION_2_METER = 2 * 3.14 * 0.0254 * (1 / 10.72);
+
+  // Turret Constants
+  private final double K_TURRET_DEGREE_OFFSET = 90;
+  private final double TURRET_GEAR_RATIO = 12.0;
+  private final double DEGREES_2_POSITION = TURRET_GEAR_RATIO / 360;
+  private final double POSITION_2_DEGREES = 360 / TURRET_GEAR_RATIO;
+
+  Joystick joystick = new Joystick(0);
+
+  PowerDistribution powerDistribution = new PowerDistribution(0, ModuleType.kRev);
+  SendableChooser<IdleMode> sendableChooser = new SendableChooser<IdleMode>();
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -26,9 +73,23 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
+    leftSlave.follow(leftMaster);
+    rightSlave.follow(rightMaster);
+    calculatedPose = new Pose2d();
+
+    // PID Configs
+    turretPIDController.setP(0.0001);
+    turretPIDController.setI(0);
+    turretPIDController.setD(0);  
+    turretPIDController.setIZone(0);
+    turretPIDController.setFF(0);
+    turretPIDController.setOutputRange(-1, 1);
+
+    // Add chooser to SmartDashboard
+    sendableChooser.setDefaultOption("CoastDrive", IdleMode.kCoast);
+    sendableChooser.addOption("BrakeDrive", IdleMode.kBrake);
+    SmartDashboard.putData(sendableChooser);    
+    SmartDashboard.putData("Robot Pose on Field", field2d);
   }
 
   /**
@@ -39,68 +100,41 @@ public class Robot extends TimedRobot {
    * SmartDashboard integrated updating.
    */
   @Override
-  public void robotPeriodic() {}
+  public void robotPeriodic() {
+    // General Information about the Robot
+    SmartDashboard.putNumber("Calculated degree setpoint :", calculateTurretSetpointDegree());
+    SmartDashboard.putNumber("Turret degree :", turretEncoder.getPosition() * POSITION_2_DEGREES);
 
-  /**
-   * This autonomous (along with the chooser code above) shows how to select between different
-   * autonomous modes using the dashboard. The sendable chooser code works with the Java
-   * SmartDashboard. If you prefer the LabVIEW Dashboard, remove all of the chooser code and
-   * uncomment the getString line to get the auto name from the text box below the Gyro
-   *
-   * <p>You can add additional auto modes by adding additional comparisons to the switch structure
-   * below with additional strings. If using the SendableChooser make sure to add them to the
-   * chooser code above as well.
-   */
-  @Override
-  public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
-  }
+    // Unit Convertion
+    double leftMeterDistance = leftMaster.getEncoder().getPosition() * kPOSITION_2_METER;
+    double rightMasterDistance = rightMaster.getEncoder().getPosition() * kPOSITION_2_METER;
 
-  /** This function is called periodically during autonomous. */
-  @Override
-  public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
+    // Pose Estimation Test : based on has any targets and pose ambiguity
+    calculatedPose = differentialDrivePoseEstimator.update(navx.getRotation2d(), leftMeterDistance, rightMasterDistance);
+    if(cameraWrapper.photonCamera.getLatestResult().hasTargets() && cameraWrapper.photonCamera.getLatestResult().getBestTarget().getPoseAmbiguity() > 0.5){
+      calculatedPose = cameraWrapper.getEstimatedGlobalPose().get().estimatedPose.toPose2d().interpolate(differentialDrivePoseEstimator.getEstimatedPosition(), 0.4);
     }
+    field2d.setRobotPose(calculatedPose);
   }
-
   /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {}
 
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() {}
+  public void teleopPeriodic() {
+    // Drive Test with coeffecient
+    drive.arcadeDrive(joystick.getRawAxis(1)*0.6, joystick.getRawAxis(4)*0.6);
+    turretPIDController.setReference(calculateTurretPosition(), ControlType.kPosition);
+  }
 
-  /** This function is called once when the robot is disabled. */
-  @Override
-  public void disabledInit() {}
+  public double calculateTurretSetpointDegree(){
+    double x = target.getX() - calculatedPose.getX();
+    double y = target.getY() - calculatedPose.getY();
+    return Math.toDegrees(Math.atan2(y, x));
+  }
 
-  /** This function is called periodically when disabled. */
-  @Override
-  public void disabledPeriodic() {}
-
-  /** This function is called once when test mode is enabled. */
-  @Override
-  public void testInit() {}
-
-  /** This function is called periodically during test mode. */
-  @Override
-  public void testPeriodic() {}
-
-  /** This function is called once when the robot is first started up. */
-  @Override
-  public void simulationInit() {}
-
-  /** This function is called periodically whilst in simulation. */
-  @Override
-  public void simulationPeriodic() {}
+  public double calculateTurretPosition(){
+    return (calculateTurretSetpointDegree() - K_TURRET_DEGREE_OFFSET) * DEGREES_2_POSITION;
+  }
 }
