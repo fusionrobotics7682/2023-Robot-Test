@@ -4,8 +4,14 @@
 
 package frc.robot;
 
+import com.revrobotics.CANSparkMax;
+import com.revrobotics.RelativeEncoder;
+import com.revrobotics.SparkMaxPIDController;
+import com.revrobotics.CANSparkMax.ControlType;
+import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+
+import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 /**
@@ -15,10 +21,19 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * project.
  */
 public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+
+  CANSparkMax shoulderCanSparkMax = new CANSparkMax(0, MotorType.kBrushless);
+  SparkMaxPIDController pidController = shoulderCanSparkMax.getPIDController();
+  RelativeEncoder encoder = shoulderCanSparkMax.getEncoder();
+
+  private final Joystick joystick = new Joystick(0);
+
+  private final double GEAR_RATIO = 100;
+  private final double GEAR_RATIO_2 = 1.5;
+  private final double GENERAL_RATIO = GEAR_RATIO * GEAR_RATIO_2;
+  private final double POSITION_2_DEGREES = 360 / GENERAL_RATIO;
+  private final double DEGREES_2_POSITION = GENERAL_RATIO / 360;
+  private final double beginingPositionDegrees = 0;
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -26,9 +41,17 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
+
+    // Beginning Position
+    encoder.setPosition(DEGREES_2_POSITION * beginingPositionDegrees);
+
+    // PID Config
+    pidController.setP(0.0001);
+    pidController.setI(0);
+    pidController.setD(0);
+    pidController.setIZone(0);
+    pidController.setFF(0);
+    pidController.setOutputRange(-1, 1);
   }
 
   /**
@@ -39,7 +62,10 @@ public class Robot extends TimedRobot {
    * SmartDashboard integrated updating.
    */
   @Override
-  public void robotPeriodic() {}
+  public void robotPeriodic() {
+    SmartDashboard.putNumber("Position", encoder.getPosition());
+    SmartDashboard.putNumber("Shoulder Degree :", encoder.getPosition() * POSITION_2_DEGREES);
+  }
 
   /**
    * This autonomous (along with the chooser code above) shows how to select between different
@@ -53,23 +79,11 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
   }
 
   /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
-    }
   }
 
   /** This function is called once when teleop is enabled. */
@@ -78,7 +92,20 @@ public class Robot extends TimedRobot {
 
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() {}
+  public void teleopPeriodic() {
+    manualControl(joystick.getRawAxis(1));
+    pidControl(Math.abs(joystick.getDirectionDegrees()));
+  }
+
+  public void manualControl(double speed){
+    shoulderCanSparkMax.set(speed);
+    //pidController.setReference(speed, ControlType.kDutyCycle);
+  }
+
+  public void pidControl(double degreeSetpoint){
+    double positionSetpoint = degreeSetpoint * DEGREES_2_POSITION;
+    pidController.setReference(positionSetpoint, ControlType.kPosition);
+  }
 
   /** This function is called once when the robot is disabled. */
   @Override
