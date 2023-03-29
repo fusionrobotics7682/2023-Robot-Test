@@ -5,6 +5,10 @@
 package frc.robot;
 
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -41,8 +45,21 @@ public class Robot extends TimedRobot {
     //field2d.setRobotPose(cameraWrapper.getEstimatedGlobalPose(new Pose2d()).get().estimatedPose.toPose2d());
     
     try{
-    SmartDashboard.putNumber("x distance :", cameraWrapper.photonCamera.getLatestResult().getBestTarget().getBestCameraToTarget().getX());
-    field2d.setRobotPose(cameraWrapper.getEstimatedGlobalPose().get().estimatedPose.toPose2d());
+      Pose3d estimatedPoseResult = cameraWrapper.getEstimatedGlobalPose().get().estimatedPose;
+      double scale = Math.pow(10, 2);
+      double xMeter =  Math.round(estimatedPoseResult.getX() * scale) / scale;
+      // double xMeter =  estimatedPoseResult.getX();
+      double yMeter = Math.round(estimatedPoseResult.getY() * scale) / scale;
+      // double yMeter = estimatedPoseResult.getY();
+      Rotation2d rotation = estimatedPoseResult.getRotation().toRotation2d();
+
+    // SmartDashboard.putNumber("x distance :", cameraWrapper.photonCamera.getLatestResult().getBestTarget().getBestCameraToTarget().getX());
+    SmartDashboard.putNumber("X distance:", xMeter);
+    SmartDashboard.putNumber("y distance:", yMeter);
+    SmartDashboard.putNumber("Z rotation", rotation.getDegrees());
+    
+    field2d.setRobotPose(xMeter, yMeter, rotation);
+
     }catch(Exception exception){
       exception.printStackTrace();
     }

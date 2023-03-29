@@ -5,6 +5,8 @@
 package frc.robot;
 
 import com.revrobotics.CANSparkMax;
+import com.revrobotics.SparkMaxPIDController;
+import com.revrobotics.CANSparkMax.ControlType;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 
@@ -25,16 +27,23 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  */
 public class Robot extends TimedRobot {
   
-  CANSparkMax leftMaster = new CANSparkMax(0, MotorType.kBrushless);
-  CANSparkMax leftSlave = new CANSparkMax(1, MotorType.kBrushless);
-  CANSparkMax rightMaster = new CANSparkMax(2, MotorType.kBrushless);
-  CANSparkMax rightSlave = new CANSparkMax(3, MotorType.kBrushless);
+  CANSparkMax leftMaster = new CANSparkMax(2, MotorType.kBrushless);
+  CANSparkMax leftSlave = new CANSparkMax(3, MotorType.kBrushless);
+  CANSparkMax rightMaster = new CANSparkMax(4, MotorType.kBrushless);
+  CANSparkMax rightSlave = new CANSparkMax(5, MotorType.kBrushless);
 
-  DifferentialDrive drive = new DifferentialDrive(leftMaster,rightMaster);
+  CANSparkMax turret = new CANSparkMax(6, MotorType.kBrushless);
+
+  SparkMaxPIDController pidController = turret.getPIDController();
+   private final double GEAR_RATIO = 12.0;
+  private final double DEGREES_2_POSITION = GEAR_RATIO / 360;
+  private final double POSITION_2_DEGREES = 360 / GEAR_RATIO;
+
+  DifferentialDrive drive = new DifferentialDrive(rightMaster,leftMaster);
 
   Joystick joystick = new Joystick(0);
 
-  PowerDistribution powerDistribution = new PowerDistribution(0, ModuleType.kRev);
+  PowerDistribution powerDistribution = new PowerDistribution(1, ModuleType.kRev);
   SendableChooser<IdleMode> sendableChooser = new SendableChooser<IdleMode>();
   double inputFactor = 1;
 
@@ -44,13 +53,22 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
+    rightMaster.setInverted(true);
     leftSlave.follow(leftMaster);
     rightSlave.follow(rightMaster);
 
     // Add chooser to SmartDashboard
     sendableChooser.setDefaultOption("CoastDrive", IdleMode.kCoast);
     sendableChooser.addOption("BrakeDrive", IdleMode.kBrake);
-    SmartDashboard.putData(sendableChooser);    
+    SmartDashboard.putData(sendableChooser); 
+    
+        // PID Config
+    pidController.setP(0.0001);
+    pidController.setI(0.0000001);
+    pidController.setD(0.0001);
+    pidController.setIZone(0.0);
+    pidController.setFF(0.000156);
+    pidController.setOutputRange(-1, 1);
   }
 
   /**
@@ -93,13 +111,14 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
     // Drive Test with coeffecient
-    drive.arcadeDrive(joystick.getRawAxis(1)*inputFactor, joystick.getRawAxis(4)*inputFactor);
+    drive.arcadeDrive(joystick.getRawAxis(1)*0.6, joystick.getRawAxis(2)*0.6);
+    //turretControl(joystick.getDirectionDegrees());
 
-    // Idle Mode Test
-    IdleMode currentMode = sendableChooser.getSelected();
-    leftMaster.setIdleMode(currentMode);
-    leftSlave.setIdleMode(currentMode);
-    rightMaster.setIdleMode(currentMode);
-    rightSlave.setIdleMode(currentMode);
+    
   }
+
+  public void turretControl(double degreesSetpoint){
+    double targetPosition = degreesSetpoint * DEGREES_2_POSITION;
+    pidController.setReference(targetPosition, ControlType.kPosition);
+  }  
 }

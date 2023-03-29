@@ -27,17 +27,16 @@ package frc.robot;
  import edu.wpi.first.apriltag.AprilTagFieldLayout;
  import edu.wpi.first.apriltag.AprilTagFields;
  import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Transform3d;
-import edu.wpi.first.math.geometry.Translation3d;
-import edu.wpi.first.wpilibj.DriverStation;
+    import edu.wpi.first.math.geometry.Rotation3d;
+    import edu.wpi.first.math.geometry.Transform3d;
+    import edu.wpi.first.math.geometry.Translation3d;
+    import edu.wpi.first.wpilibj.DriverStation;
  import java.io.IOException;
  import java.util.Optional;
-
-import org.photonvision.EstimatedRobotPose;
-import org.photonvision.PhotonCamera;
-import org.photonvision.PhotonPoseEstimator;
-import org.photonvision.PhotonPoseEstimator.PoseStrategy;
+ import org.photonvision.EstimatedRobotPose;
+ import org.photonvision.PhotonCamera;
+ import org.photonvision.PhotonPoseEstimator;
+ import org.photonvision.PhotonPoseEstimator.PoseStrategy;
  
  public class PhotonCameraWrapper {
      public PhotonCamera photonCamera;
@@ -54,7 +53,8 @@ import org.photonvision.PhotonPoseEstimator.PoseStrategy;
              // Create pose estimator
              photonPoseEstimator =
                      new PhotonPoseEstimator(
-                             fieldLayout, PoseStrategy.LOWEST_AMBIGUITY, photonCamera, new Transform3d(new Translation3d(0.3, 0, 0), new Rotation3d()));
+                             fieldLayout, PoseStrategy.CLOSEST_TO_LAST_POSE, photonCamera, new Transform3d(new Translation3d(0.3, 0, 0), new Rotation3d()));
+             photonPoseEstimator.setMultiTagFallbackStrategy(PoseStrategy.AVERAGE_BEST_TARGETS);
          } catch (IOException e) {
              // The AprilTagFieldLayout failed to load. We won't be able to estimate poses if we don't know
              // where the tags are.

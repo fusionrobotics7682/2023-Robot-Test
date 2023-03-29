@@ -25,69 +25,40 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  */
 public class Robot extends TimedRobot {
   
-  CANSparkMax shoulderArmMaster = new CANSparkMax(0, MotorType.kBrushless);
-  CANSparkMax shoulderArmSlave = new CANSparkMax(0, MotorType.kBrushless);
+  CANSparkMax shoulderArmMaster = new CANSparkMax(7, MotorType.kBrushless);
 
   RelativeEncoder shoulderArmEncoder = shoulderArmMaster.getEncoder();
-  double shoulderArmGearRatio = 1;
 
   Joystick joystick = new Joystick(0);
 
-  PowerDistribution powerDistribution = new PowerDistribution(0, ModuleType.kRev);
-  SendableChooser <IdleMode> sendableChooser = new SendableChooser<IdleMode>();
-
-  double inputFactor = 1;
-  double shoulderArmUpLimitDegree = 270;
-  double shoulderArmDownLimitDegree = -30;
   double initialShoulderArmDegree = -30;
   double shoulderArmDegree;
+
+  private final double GEAR_RATIO = 100;
+  private final double GEAR_RATIO_2 = 1.5;
+  private final double GENERAL_RATIO = GEAR_RATIO * GEAR_RATIO_2;
+  private final double POSITION_2_DEGREES = 360 / GENERAL_RATIO;
+  private final double DEGREES_2_POSITION = GENERAL_RATIO / 360;
   
   @Override
   public void robotInit() {
-    shoulderArmSlave.follow(shoulderArmMaster); 
-    shoulderArmEncoder.setPosition(shoulderArmGearRatio * initialShoulderArmDegree / 360);
-
-    sendableChooser.setDefaultOption("CoastShoulderArm", IdleMode.kCoast);
-    sendableChooser.addOption("BrakeShoulderArm", IdleMode.kBrake);
-    SmartDashboard.putData(sendableChooser);
+    shoulderArmEncoder.setPosition(initialShoulderArmDegree * DEGREES_2_POSITION);
   }
 
   @Override
   public void robotPeriodic() {
-
-    shoulderArmDegree = (shoulderArmEncoder.getPosition() / shoulderArmGearRatio) * 360;
-
-    SmartDashboard.putNumber("Voltage", powerDistribution.getVoltage());
-    SmartDashboard.putNumber("totalCurrent", powerDistribution.getTotalCurrent());
-    SmartDashboard.putNumber("shoulderArmMasterVoltage", powerDistribution.getCurrent(0));
-    SmartDashboard.putNumber("shoulderArmSlaveVoltage", powerDistribution.getCurrent(1));
-    SmartDashboard.putNumber("inputFactor", inputFactor);
+    shoulderArmDegree = shoulderArmEncoder.getPosition() * POSITION_2_DEGREES;
     SmartDashboard.putNumber("Shoulder Arm degree :", shoulderArmDegree);
+    SmartDashboard.putNumber("Shoulder Arm position :", shoulderArmEncoder.getPosition());
+  }
 
-
-    if(joystick.getRawButton(1)){
-      inputFactor = 1;
-    }
-    else if(joystick.getRawButton(2)){
-      inputFactor = 0.75;
-    }
-    else if(joystick.getRawButton(3)){
-      inputFactor = 0.50;
-    }
-    else if(joystick.getRawButton(4)){
-      inputFactor = 0.25;
-    }
+  @Override
+  public void teleopInit() {
+    shoulderArmEncoder.setPosition(0);
   }
 
   @Override
   public void teleopPeriodic() {
-
-    if(shoulderArmDegree < shoulderArmUpLimitDegree && shoulderArmDegree > shoulderArmDownLimitDegree){
-        shoulderArmMaster.set(joystick.getRawAxis(1)*inputFactor);
-    }
-
-    IdleMode currentMode = sendableChooser.getSelected();
-    shoulderArmMaster.setIdleMode(currentMode);
-    shoulderArmSlave.setIdleMode(currentMode);
+    shoulderArmMaster.set(joystick.getRawAxis(1)*0.6);
   }
 }

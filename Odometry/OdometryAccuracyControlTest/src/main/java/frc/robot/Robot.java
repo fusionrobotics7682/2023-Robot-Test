@@ -4,18 +4,26 @@
 
 package frc.robot;
 
+import java.sql.Driver;
+
 import com.kauailabs.navx.frc.AHRS;
 import com.revrobotics.CANSparkMax;
+import com.revrobotics.SparkMaxPIDController;
+import com.revrobotics.CANSparkMax.ControlType;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 
 import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -29,25 +37,29 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * project.
  */
 public class Robot extends TimedRobot {
-  CANSparkMax leftMaster = new CANSparkMax(0, MotorType.kBrushless);
-  CANSparkMax leftSlave = new CANSparkMax(1, MotorType.kBrushless);
-  CANSparkMax rightMaster = new CANSparkMax(2, MotorType.kBrushless);
-  CANSparkMax rightSlave = new CANSparkMax(3, MotorType.kBrushless);
+  CANSparkMax leftMaster = new CANSparkMax(2, MotorType.kBrushless);
+  CANSparkMax leftSlave = new CANSparkMax(3, MotorType.kBrushless);
+  CANSparkMax rightMaster = new CANSparkMax(4, MotorType.kBrushless);
+  CANSparkMax rightSlave = new CANSparkMax(5, MotorType.kBrushless);
 
   DifferentialDrive drive = new DifferentialDrive(leftMaster,rightMaster);
   AHRS navx = new AHRS();
 
   DifferentialDrivePoseEstimator differentialDrivePoseEstimator = new DifferentialDrivePoseEstimator(new DifferentialDriveKinematics(0.23), new Rotation2d(), 0, 0, new Pose2d());
   PhotonCameraWrapper cameraWrapper = new PhotonCameraWrapper();
+
   Field2d field2d = new Field2d();
+
   Pose2d calculatedPose;
 
-  private final double kPOSITION_2_METER = 2 * 3.14 * 0.0254 * (1 / 10.72);
+  final double TURRET_GEAR_RATIO = 12;
+  final double TURRET_DEGREE_TO_POSITION = 12 / 360;
+  final double CHASSIS_GEAR_RATIO = 10.72;
+  final double WHEEL_DIAMETER = Units.inchesToMeters(3.1);
+
+  private final double kPOSITION_2_METER = 2 * 3.14 * WHEEL_DIAMETER * (1 / CHASSIS_GEAR_RATIO);
 
   Joystick joystick = new Joystick(0);
-
-  PowerDistribution powerDistribution = new PowerDistribution(0, ModuleType.kRev);
-  SendableChooser<IdleMode> sendableChooser = new SendableChooser<IdleMode>();
   double inputFactor = 1;
 
   /**
@@ -58,12 +70,9 @@ public class Robot extends TimedRobot {
   public void robotInit() {
     leftSlave.follow(leftMaster);
     rightSlave.follow(rightMaster);
-    calculatedPose = new Pose2d();
 
-    // Add chooser to SmartDashboard
-    sendableChooser.setDefaultOption("CoastDrive", IdleMode.kCoast);
-    sendableChooser.addOption("BrakeDrive", IdleMode.kBrake);
-    SmartDashboard.putData(sendableChooser);    
+    rightMaster.setInverted(true);
+
     SmartDashboard.putData("Robot Pose on Field", field2d);
   }
 
@@ -76,48 +85,46 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotPeriodic() {
-    // General Information about the Robot
-
-    // Monitoring pose ambiguity
-    cameraWrapper.photonCamera.getLatestResult().targets.stream().forEach(x -> {
-      SmartDashboard.putNumber("Target pose ambiguity :", x.getPoseAmbiguity());
-    });
-    SmartDashboard.putNumber("Best target pose ambiguity :", cameraWrapper.photonCamera.getLatestResult().getBestTarget().getPoseAmbiguity());
-    SmartDashboard.putBoolean("Vision has target? : ", cameraWrapper.photonCamera.getLatestResult().hasTargets());
-
     // Unit Convertion
     double leftMeterDistance = leftMaster.getEncoder().getPosition() * kPOSITION_2_METER;
     double rightMasterDistance = rightMaster.getEncoder().getPosition() * kPOSITION_2_METER;
 
-    // Pose Estimation Test : based on has any targets and pose ambiguity
-    calculatedPose = differentialDrivePoseEstimator.update(navx.getRotation2d(), leftMeterDistance, rightMasterDistance);
-    if(cameraWrapper.photonCamera.getLatestResult().hasTargets() && cameraWrapper.photonCamera.getLatestResult().getBestTarget().getPoseAmbiguity() > 0.5){
-      calculatedPose = cameraWrapper.getEstimatedGlobalPose().get().estimatedPose.toPose2d().interpolate(differentialDrivePoseEstimator.getEstimatedPosition(), 0.4);
-    }
-    field2d.setRobotPose(calculatedPose);
+    SmartDashboard.putNumber("Left Meter distance :", leftMeterDistance);
+    SmartDashboard.putNumber("Right Meter distance :", rightMasterDistance);
+    SmartDashboard.putBoolean("Vision has Target :", cameraWrapper.photonCamera.getLatestResult().hasTargets());
 
-    // Input Factor for differential drive
-    if(joystick.getRawButton(1)){
-      inputFactor = 1;
-    }
-    else if(joystick.getRawButton(2)){
-      inputFactor = 0.75;
-    }
-    else if(joystick.getRawButton(3)){
-      inputFactor = 0.50; 
-    }
-    else if(joystick.getRawButton(4)){
-      inputFactor = 0.25;
+    try{  
+    calculatedPose = differentialDrivePoseEstimator.update(navx.getRotation2d(), leftMeterDistance, rightMasterDistance);
+    field2d.setRobotPose(calculatedPose);
+    }catch(Exception exception){
+      exception.printStackTrace();
     }
   }
+
   /** This function is called once when teleop is enabled. */
   @Override
-  public void teleopInit() {}
+  public void teleopInit() {
+    navx.reset();
+
+    double coeffecient = 0;
+    if(DriverStation.getAlliance()==Alliance.Blue){
+      coeffecient+=180;
+    }
+
+    try{
+        differentialDrivePoseEstimator.resetPosition(new Rotation2d(0), 0, 0, new Pose2d(new Translation2d(), new Rotation2d(Math.toRadians(navx.getRotation2d().getDegrees()+coeffecient))));
+      }catch(Exception exception){
+        exception.printStackTrace();
+      }
+    leftMaster.getEncoder().setPosition(0);
+    rightMaster.getEncoder().setPosition(0);
+  }
 
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
     // Drive Test with coeffecient
-    drive.arcadeDrive(joystick.getRawAxis(1)*inputFactor, joystick.getRawAxis(4)*inputFactor);
+    SmartDashboard.putNumber("Navx rotation2d getDegrees", navx.getRotation2d().getDegrees());
+    drive.arcadeDrive(joystick.getRawAxis(1)*0.6, joystick.getRawAxis(2)*0.6); 
   }
 }

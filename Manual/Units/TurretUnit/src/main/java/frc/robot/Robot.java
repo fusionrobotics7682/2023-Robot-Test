@@ -10,6 +10,7 @@ import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
@@ -25,11 +26,11 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  */
 public class Robot extends TimedRobot {
 
-  CANSparkMax turret = new CANSparkMax(1, MotorType.kBrushless);
+  CANSparkMax turret = new CANSparkMax(6, MotorType.kBrushless);
   RelativeEncoder turretEncoder = turret.getEncoder();
 
   Joystick joystick = new Joystick(0);
-  double inputFactor = 1;
+  double inputFactor = 0.5;
 
   double turretGearRatio = 12;
   double initialTurretDegrees = 0;
@@ -40,7 +41,7 @@ public class Robot extends TimedRobot {
 
   final double POSITION_2_DEGREES = 12 * 360;
 
-  PowerDistribution powerDistribution = new PowerDistribution(0, ModuleType.kRev);
+  // PowerDistribution powerDistribution = new PowerDistribution(0, ModuleType.kRev);
   SendableChooser <IdleMode> sendableChooser = new SendableChooser<IdleMode>();
 
   /**
@@ -53,6 +54,8 @@ public class Robot extends TimedRobot {
     sendableChooser.addOption("BrakeTurret", IdleMode.kBrake);
     SmartDashboard.putData(sendableChooser);
     turretEncoder.setPosition(initialTurretDegrees);
+    turret.setIdleMode(IdleMode.kCoast);
+    turret.setInverted(true);
   }
 
   /**
@@ -66,38 +69,28 @@ public class Robot extends TimedRobot {
   public void robotPeriodic() {
     currentTurretDegrees = (turretEncoder.getPosition() / POSITION_2_DEGREES);
 
-    SmartDashboard.putNumber("Voltage", powerDistribution.getVoltage());
-    SmartDashboard.putNumber("totalCurrent", powerDistribution.getTotalCurrent());
-    SmartDashboard.putNumber("turretVoltage", powerDistribution.getCurrent(1));
+    // SmartDashboard.putNumber("Voltage", powerDistribution.getVoltage());
+    // SmartDashboard.putNumber("totalCurrent", powerDistribution.getTotalCurrent());
+    // SmartDashboard.putNumber("turretVoltage", powerDistribution.getCurrent(1));
     SmartDashboard.putNumber("inputFactor", inputFactor);
     SmartDashboard.putNumber("Turret Degree", currentTurretDegrees);
-
-    if(joystick.getRawButton(1)){
-      inputFactor = 1;
-    }
-    else if(joystick.getRawButton(2)){
-      inputFactor = 0.75;
-    }
-    else if(joystick.getRawButton(3)){
-      inputFactor = 0.50;
-    }
-    else if(joystick.getRawButton(4)){
-      inputFactor = 0.25;
-    }
-
-
   }
 
   @Override
   public void teleopPeriodic() {
-    if(currentTurretDegrees > turretDownLimitDegrees && currentTurretDegrees < turretUpLimitDegrees){
-        turret.set(joystick.getRawAxis(1)*inputFactor);
-    }
+    
+    if(joystick.getRawButton(1)) {turret.set(0.2);}
+    
+    else if(joystick.getRawButton(2)) {turret.set(0.5);}
+   
+    else if(joystick.getRawButton(3)) {turret.set(0.7);}
+    
+    else if(joystick.getRawButton(4)) {turret.set(1);}
+
     else{
       turret.set(0);
     }
-    IdleMode currentMode = sendableChooser.getSelected();
-    turret.setIdleMode(currentMode);
+    
   }
 
 }

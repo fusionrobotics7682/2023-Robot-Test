@@ -54,7 +54,7 @@ import org.photonvision.PhotonPoseEstimator.PoseStrategy;
              // Create pose estimator
              photonPoseEstimator =
                      new PhotonPoseEstimator(
-                             fieldLayout, PoseStrategy.LOWEST_AMBIGUITY, photonCamera, new Transform3d(new Translation3d(0.3, 0, 0), new Rotation3d()));
+                             fieldLayout, PoseStrategy.AVERAGE_BEST_TARGETS, photonCamera, new Transform3d(new Translation3d(0.3, 0, 0), new Rotation3d()));
          } catch (IOException e) {
              // The AprilTagFieldLayout failed to load. We won't be able to estimate poses if we don't know
              // where the tags are.
